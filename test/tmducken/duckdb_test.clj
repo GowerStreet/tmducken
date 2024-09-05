@@ -216,8 +216,8 @@
     (duckdb/create-table! @conn* cities-ds)
     (duckdb/insert-dataset! @conn* cities-ds)
     (let [result-ds (duckdb/sql->dataset
-                      @conn*
-                      "SELECT country, name, \"2010\"::Integer as '2010' FROM (PIVOT cities ON year USING sum(population::SmallInt) order by country, name);")]
+                     @conn*
+                     "SELECT country, name, \"2010\"::Integer as '2010' FROM (PIVOT cities ON year USING sum(population::SmallInt) order by country, name);")]
       (is (= [{"country" "NL", "name" "Amsterdam", "2010" 1065}
               {"country" "US", "name" "New York", "2010" 8175}
               {"country" "US", "name" "Seattle", "2010" 608}]
