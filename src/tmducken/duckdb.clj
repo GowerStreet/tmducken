@@ -71,7 +71,7 @@ _unnamed [5 3]:
            [java.time LocalDate LocalTime Instant]
            [tech.v3.datatype.ffi Pointer]
            [tech.v3.datatype UnsafeUtil]
-           [ham_fisted ITypedReduce IFnDef$LO Casts IFnDef]
+           [ham_fisted ITypedReduce IFnDef$LO Casts IFnDef ArrayLists]
            [tech.v3.datatype ObjectReader]
            [org.roaringbitmap RoaringBitmap]
            [clojure.lang Seqable IReduceInit Counted IDeref]
@@ -559,115 +559,152 @@ tmducken.duckdb> (get-config-options)
 
 
 (defn- coldata->buffer
-  [^RoaringBitmap missing ^long n-rows ^long duckdb-type ^long data-ptr]
-  (case (get duckdb-ffi/duckdb-type-map duckdb-type)
-    :DUCKDB_TYPE_BOOLEAN
-    (-> (native-buffer/wrap-address data-ptr n-rows nil)
-        (dt/elemwise-cast :boolean))
+  [^RoaringBitmap missing n-rows logical-type ddb-vec]
+  (let [type-id (duckdb-ffi/duckdb_get_type_id logical-type)
+        n-rows (long n-rows)
+        data-ptr (.address ^Pointer (duckdb-ffi/duckdb_vector_get_data ddb-vec))]
+    (case (get duckdb-ffi/duckdb-type-map type-id)
+      :DUCKDB_TYPE_BOOLEAN
+      (-> (native-buffer/wrap-address data-ptr n-rows nil)
+          (dt/elemwise-cast :boolean))
 
-    :DUCKDB_TYPE_TINYINT
-    (native-buffer/wrap-address data-ptr n-rows nil)
+      :DUCKDB_TYPE_TINYINT
+      (native-buffer/wrap-address data-ptr n-rows nil)
 
-    :DUCKDB_TYPE_SMALLINT
-    (-> (native-buffer/wrap-address data-ptr (* 2 n-rows) nil)
-        (native-buffer/set-native-datatype :int16))
+      :DUCKDB_TYPE_SMALLINT
+      (-> (native-buffer/wrap-address data-ptr (* 2 n-rows) nil)
+          (native-buffer/set-native-datatype :int16))
 
-    :DUCKDB_TYPE_INTEGER
-    (-> (native-buffer/wrap-address data-ptr (* 4 n-rows) nil)
-        (native-buffer/set-native-datatype :int32))
+      :DUCKDB_TYPE_INTEGER
+      (-> (native-buffer/wrap-address data-ptr (* 4 n-rows) nil)
+          (native-buffer/set-native-datatype :int32))
 
-    :DUCKDB_TYPE_BIGINT
-    (-> (native-buffer/wrap-address data-ptr (* 8 n-rows) nil)
-        (native-buffer/set-native-datatype :int64))
+      :DUCKDB_TYPE_BIGINT
+      (-> (native-buffer/wrap-address data-ptr (* 8 n-rows) nil)
+          (native-buffer/set-native-datatype :int64))
 
-    :DUCKDB_TYPE_UTINYINT
-    (-> (native-buffer/wrap-address data-ptr n-rows nil)
-        (native-buffer/set-native-datatype :uint8))
+      :DUCKDB_TYPE_UTINYINT
+      (-> (native-buffer/wrap-address data-ptr n-rows nil)
+          (native-buffer/set-native-datatype :uint8))
 
-    :DUCKDB_TYPE_USMALLINT
-    (-> (native-buffer/wrap-address data-ptr (* 2 n-rows) nil)
-        (native-buffer/set-native-datatype :uint16))
+      :DUCKDB_TYPE_USMALLINT
+      (-> (native-buffer/wrap-address data-ptr (* 2 n-rows) nil)
+          (native-buffer/set-native-datatype :uint16))
 
-    :DUCKDB_TYPE_UINTEGER
-    (-> (native-buffer/wrap-address data-ptr (* 4 n-rows) nil)
-        (native-buffer/set-native-datatype :uint32))
+      :DUCKDB_TYPE_UINTEGER
+      (-> (native-buffer/wrap-address data-ptr (* 4 n-rows) nil)
+          (native-buffer/set-native-datatype :uint32))
 
-    :DUCKDB_TYPE_UBIGINT
-    (-> (native-buffer/wrap-address data-ptr (* 8 n-rows) nil)
-        (native-buffer/set-native-datatype :uint64))
+      :DUCKDB_TYPE_UBIGINT
+      (-> (native-buffer/wrap-address data-ptr (* 8 n-rows) nil)
+          (native-buffer/set-native-datatype :uint64))
 
-    :DUCKDB_TYPE_FLOAT
-    (-> (native-buffer/wrap-address data-ptr (* 4 n-rows) nil)
-        (native-buffer/set-native-datatype :float32))
+      :DUCKDB_TYPE_FLOAT
+      (-> (native-buffer/wrap-address data-ptr (* 4 n-rows) nil)
+          (native-buffer/set-native-datatype :float32))
 
-    :DUCKDB_TYPE_DOUBLE
-    (-> (native-buffer/wrap-address data-ptr (* 8 n-rows) nil)
-        (native-buffer/set-native-datatype :float64))
+      :DUCKDB_TYPE_DOUBLE
+      (-> (native-buffer/wrap-address data-ptr (* 8 n-rows) nil)
+          (native-buffer/set-native-datatype :float64))
 
-    :DUCKDB_TYPE_DATE
-    (-> (native-buffer/wrap-address data-ptr (* 4 n-rows) nil)
-        (native-buffer/set-native-datatype :packed-local-date))
+      :DUCKDB_TYPE_DATE
+      (-> (native-buffer/wrap-address data-ptr (* 4 n-rows) nil)
+          (native-buffer/set-native-datatype :packed-local-date))
 
-    :DUCKDB_TYPE_TIME
-    (-> (native-buffer/wrap-address data-ptr (* 8 n-rows) nil)
-        (native-buffer/set-native-datatype :packed-local-time))
+      :DUCKDB_TYPE_TIME
+      (-> (native-buffer/wrap-address data-ptr (* 8 n-rows) nil)
+          (native-buffer/set-native-datatype :packed-local-time))
 
-    :DUCKDB_TYPE_TIMESTAMP
-    (-> (native-buffer/wrap-address data-ptr (* 8 n-rows) nil)
-        (native-buffer/set-native-datatype :packed-instant))
+      :DUCKDB_TYPE_TIMESTAMP
+      (-> (native-buffer/wrap-address data-ptr (* 8 n-rows) nil)
+          (native-buffer/set-native-datatype :packed-instant))
 
-    :DUCKDB_TYPE_UUID
-    (GenericObjReader.
-     :uuid UUID
-     (let [us (UnsafeUtil/getUnsafe)]
-       (reify IFnDef$LO
-         (invokePrim [this idx]
-           (let [laddr (+ data-ptr (* idx 16))]
-             ;; typedef struct {
-             ;;     uint64_t lower;
-             ;;     int64_t upper;
-             ;; } duckdb_hugeint;
-             ;; For some reason the msb when r/w with duckdb api nee to be inverted.
-             (let [msbytes (.getLong us (+ laddr 8))
-                   msbytes (toggle-long-msb msbytes)
-                   lsbytes (.getLong us laddr)]
-               (UUID. msbytes lsbytes))))))
-     0 n-rows)
-
-    :DUCKDB_TYPE_VARCHAR
-    ;;     typedef struct {
-    ;; 	union {
-    ;; 		struct {
-    ;; 			uint32_t length;
-    ;; 			char prefix[4];
-    ;; 			char *ptr;
-    ;; 		} pointer;
-    ;; 		struct {
-    ;; 			uint32_t length;
-    ;; 			char inlined[12];
-    ;; 		} inlined;
-    ;; 	} value;
-    ;; } duckdb_string_t;
-    (let [string-t-width 16
-          inline-len 12
-          nbuf (native-buffer/wrap-address data-ptr (* string-t-width n-rows) nil)]
+      :DUCKDB_TYPE_UUID
       (GenericObjReader.
-       :string String
-       (reify IFnDef$LO
-         (invokePrim [this idx]
-           (if (.contains missing (unchecked-int idx))
-             ""
-             (let [len-off (* idx string-t-width)
-                   slen (native-buffer/read-int nbuf len-off)]
-               #_(println "reading string at idx" idx len-off slen)
-               (if (<= slen inline-len)
-                 (let [soff (+ len-off 4)]
-                   (native-buffer/native-buffer->string nbuf soff slen))
-                 (let [ptr-off (+ len-off 8)
-                       ptr-addr (native-buffer/read-long nbuf ptr-off)]
-                   (native-buffer/native-buffer->string (native-buffer/wrap-address ptr-addr slen nil))))))))
-       0 n-rows))
-    (throw (RuntimeException. (format "Failed to get a valid column type for integer type %d" duckdb-type)))))
+       :uuid UUID
+       (let [us (UnsafeUtil/getUnsafe)]
+         (reify IFnDef$LO
+           (invokePrim [this idx]
+             (let [laddr (+ data-ptr (* idx 16))]
+               ;; typedef struct {
+               ;;     uint64_t lower;
+               ;;     int64_t upper;
+               ;; } duckdb_hugeint;
+               ;; For some reason the msb when r/w with duckdb api nee to be inverted.
+               (let [msbytes (.getLong us (+ laddr 8))
+                     msbytes (toggle-long-msb msbytes)
+                     lsbytes (.getLong us laddr)]
+                 (UUID. msbytes lsbytes))))))
+       0 n-rows)
+
+      :DUCKDB_TYPE_VARCHAR
+      ;;     typedef struct {
+      ;; 	union {
+      ;; 		struct {
+      ;; 			uint32_t length;
+      ;; 			char prefix[4];
+      ;; 			char *ptr;
+      ;; 		} pointer;
+      ;; 		struct {
+      ;; 			uint32_t length;
+      ;; 			char inlined[12];
+      ;; 		} inlined;
+      ;; 	} value;
+      ;; } duckdb_string_t;
+      (let [string-t-width 16
+            inline-len 12
+            nbuf (native-buffer/wrap-address data-ptr (* string-t-width n-rows) nil)]
+        (GenericObjReader.
+         :string String
+         (reify IFnDef$LO
+           (invokePrim [this idx]
+             (if (.contains missing (unchecked-int idx))
+               ""
+               (let [len-off (* idx string-t-width)
+                     slen (native-buffer/read-int nbuf len-off)]
+                 #_(println "reading string at idx" idx len-off slen)
+                 (if (<= slen inline-len)
+                   (let [soff (+ len-off 4)]
+                     (native-buffer/native-buffer->string nbuf soff slen))
+                   (let [ptr-off (+ len-off 8)
+                         ptr-addr (native-buffer/read-long nbuf ptr-off)]
+                     (native-buffer/native-buffer->string (native-buffer/wrap-address ptr-addr slen nil))))))))
+         0 n-rows))
+
+      :DUCKDB_TYPE_LIST
+      (let [child-vec (duckdb-ffi/duckdb_list_vector_get_child ddb-vec)
+            child-vec-n-elems (duckdb-ffi/duckdb_list_vector_get_size ddb-vec)
+            child-logical-type (duckdb-ffi/duckdb_list_type_child_type logical-type)
+            childbuf (-> (coldata->buffer (RoaringBitmap.) child-vec-n-elems child-logical-type child-vec)
+                         (dt/->buffer))
+            ;;Two longs per entry - offset, length
+            lbuf (-> (native-buffer/wrap-address data-ptr (* 2 8 n-rows) nil)
+                     (native-buffer/set-native-datatype :int64)
+                     (dt/->buffer))]
+        ;;destroy logical type takes a pointer to pointer
+        (-> (dt-ffi/make-ptr :pointer (.address ^Pointer child-logical-type))
+            (duckdb-ffi/duckdb_destroy_logical_type))
+        (GenericObjReader.
+         :object Object
+         (reify IFnDef$LO
+           (invokePrim [this idx]
+             (let [soff (* 2 idx)
+                   offset (.readLong lbuf soff)
+                   length (.readLong lbuf (+ 1 soff))]
+               (case length
+                 0 []
+                 1 [(.readObject childbuf offset)]
+                 2 [(.readObject childbuf offset)
+                    (.readObject childbuf (+ offset 1))]
+                 3 [(.readObject childbuf offset)
+                    (.readObject childbuf (+ offset 1))
+                    (.readObject childbuf (+ offset 2))]
+                 (let [objv (object-array length)]
+                   (dotimes [local-off length]
+                     (aset objv local-off (.readObject childbuf (+ offset local-off))))
+                   (ArrayLists/toList objv))))))
+         0 n-rows))
+      (throw (RuntimeException. (format "Failed to get a valid column type for duckdb-type-id %d" type-id))))))
 
 
 (defn- supplier-seq
@@ -804,14 +841,11 @@ tmducken.duckdb> (get-config-options)
   (let [metadata {:duckdb-result duckdb-result}
         n-cols (long (duckdb-ffi/duckdb_column_count duckdb-result))
         names (hamf/mapv #(dt-ffi/c->string (duckdb-ffi/duckdb_column_name duckdb-result %)) (hamf/range n-cols))
-        type-ids (hamf/mapv #(let [db-type (duckdb-ffi/duckdb_column_logical_type duckdb-result %)
-                                   ;;complex work-around so we have a pointer to release as the destroy fn takes
-                                   ;;a ptr and not the thing by copying.
-                                   retval (duckdb-ffi/duckdb_get_type_id db-type)]
-                               (-> (dt-ffi/make-ptr :pointer (.address ^Pointer db-type))
-                                   (duckdb-ffi/duckdb_destroy_logical_type))
-                               retval)
-                            (hamf/range n-cols))
+        logical-types (hamf/mapv #(duckdb-ffi/duckdb_column_logical_type duckdb-result %) (hamf/range n-cols))
+        release-logical-types* (delay (reduce (fn [acc logical-type]
+                                                (-> (dt-ffi/make-ptr :pointer (.address ^Pointer logical-type))
+                                                    (duckdb-ffi/duckdb_destroy_logical_type)))
+                                              logical-types))
         ;;This function gets called a *lot*
         realize-chunk (fn [data-chunk clone?]
                         (let [n-rows (duckdb-ffi/duckdb_data_chunk_get_size data-chunk)
@@ -825,15 +859,14 @@ tmducken.duckdb> (get-config-options)
                               (->> (hamf/range n-cols)
                                    (hamf/mapv (fn [cidx]
                                                 (let [vdata (duckdb-ffi/duckdb_data_chunk_get_vector data-chunk cidx)
-                                                      ^Pointer data-ptr (duckdb-ffi/duckdb_vector_get_data vdata)
                                                       missing (validity->missing
                                                                n-rows
                                                                (duckdb-ffi/duckdb_vector_get_validity vdata))
                                                       coldata (try
                                                                 (coldata->buffer missing
                                                                                  n-rows
-                                                                                 (type-ids cidx)
-                                                                                 (.-address data-ptr))
+                                                                                 (logical-types cidx)
+                                                                                 vdata)
                                                                 (catch Exception e
                                                                   (throw (RuntimeException.
                                                                           (str "Error processing column " (names cidx)) e))))
@@ -858,12 +891,12 @@ tmducken.duckdb> (get-config-options)
                              (duckdb-ffi/duckdb_result_chunk_count duckdb-result)
                              0
                              duckdb-result
-                             (delay nil)
+                             release-logical-types*
                              realize-chunk
                              reduce-type)
       (StreamingResultChunks. sql
                               duckdb-result
-                              (delay nil)
+                              release-logical-types*
                               realize-chunk
                               reduce-type))))
 
