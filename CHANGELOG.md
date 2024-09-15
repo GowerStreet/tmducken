@@ -1,3 +1,8 @@
+## 0.10.1-01
+ * Support for 0.10.X series of duckdb - 0.10.0 was a bad release however - do not use!!
+ * Support for list datatype
+ * Support for schema tables during insert-dataset!
+ 
 ## 0.8.1-13
  * Errors are [correctly reported for prepared statements](https://github.com/techascent/tmducken/pull/16).
  * Support for [packaging the binary in the jar using nix](https://github.com/techascent/tmducken/pull/15).
