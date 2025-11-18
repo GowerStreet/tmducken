@@ -79,9 +79,7 @@ _unnamed [5 3]:
            [tech.v3.dataset.impl.dataset Dataset]
            [java.lang AutoCloseable]))
 
-
 (set! *warn-on-reflection* true)
-
 
 (defonce ^:private initialize* (atom false))
 
@@ -89,11 +87,9 @@ _unnamed [5 3]:
   []
   @initialize*)
 
-
 (defn duckdb-library-version
   ^String []
   (dt-ffi/c->string (duckdb-ffi/duckdb_library_version)))
-
 
 (defn- check-lib-version!
   []
@@ -101,7 +97,6 @@ _unnamed [5 3]:
     (when (= lib-version "v0.10.0")
       (throw (RuntimeException. (str "Invalid version: " lib-version " - " "this version of tmducken is meant for duckdb version 0.10.1 and up but should also work with 0.9.2"))))
     :ok))
-
 
 (defn initialize!
   "Initialize the duckdb ffi system.  This must be called first should be called only once.
@@ -137,7 +132,6 @@ _unnamed [5 3]:
             true)))
   ([] (initialize! nil)))
 
-
 (defn get-config-options
   "Returns a sequence of maps of {:name :desc} describing valid valid configuration
   options to the open-db function."
@@ -150,7 +144,6 @@ _unnamed [5 3]:
                   (duckdb-ffi/duckdb_get_config_flag idx msg-ptr desc-ptr)
                   {:name (dt-ffi/c->string (Pointer. (msg-ptr 0)))
                    :desc (dt-ffi/c->string (Pointer. (desc-ptr 0)))}))))))
-
 
 (defn open-db
   "Open a database.  `path` may be nil in which case database is opened in-memory.
@@ -202,14 +195,12 @@ tmducken.duckdb> (get-config-options)
   (^Pointer []
    (open-db "")))
 
-
 (defn close-db
   "Close the database."
   [^Pointer db]
   (resource/stack-resource-context
    (let [db-ptr (dt-ffi/make-ptr :pointer (.address db))]
      (duckdb-ffi/duckdb_close db-ptr))))
-
 
 (defn connect
   "Create a new database connection from an opened database.
@@ -220,14 +211,12 @@ tmducken.duckdb> (get-config-options)
      (duckdb-ffi/duckdb_connect db ctx-ptr)
      (Pointer. (ctx-ptr 0)))))
 
-
 (defn disconnect
   "Disconnect a connection."
   [^Pointer conn]
   (resource/stack-resource-context
    (let [conn-ptr (dt-ffi/make-ptr :pointer (.address conn))]
      (duckdb-ffi/duckdb_disconnect conn-ptr))))
-
 
 (defn run-query!
   "Run a query ignoring the results.  Useful for queries such as single-row insert or update where
@@ -251,7 +240,6 @@ tmducken.duckdb> (get-config-options)
   ([conn sql]
    (run-query! conn sql nil)))
 
-
 (defn create-table!
   "Create an sql table based off of the column datatypes of the dataset.  Note that users
   can also call [[execute-query!]] with their own sql create-table string.  Note that the
@@ -269,7 +257,6 @@ tmducken.duckdb> (get-config-options)
   ([conn dataset]
    (create-table! conn dataset nil)))
 
-
 (sql/set-datatype-mapping! "duckdb" :boolean "bool" -7
                            sql/generic-sql->column sql/generic-column->sql)
 (sql/set-datatype-mapping! "duckdb" :string "varchar" 12
@@ -277,13 +264,11 @@ tmducken.duckdb> (get-config-options)
 (sql/set-datatype-mapping! "duckdb" :uuid "UUID" 1111
                            sql/generic-sql->column sql/generic-column->sql)
 
-
 (defn drop-table!
   [conn dataset]
   (let [ds-name (sql/table-name dataset)]
     (run-query! conn (format "drop table %s" ds-name))
     ds-name))
-
 
 (defn- local-time->microseconds
   ^long [^LocalTime lt]
@@ -291,7 +276,6 @@ tmducken.duckdb> (get-config-options)
     (-> (.toNanoOfDay lt)
         (/ 1000))
     0))
-
 
 (defn- dtype-type->duckdb
   [dt]
@@ -313,11 +297,9 @@ tmducken.duckdb> (get-config-options)
     :string duckdb-ffi/DUCKDB_TYPE_VARCHAR
     :uuid duckdb-ffi/DUCKDB_TYPE_UUID))
 
-
 (defn- ptr->addr
   ^long [ptr]
   (.address (dt-ffi/->pointer ptr)))
-
 
 (defn toggle-long-msb
   [x]
@@ -342,7 +324,7 @@ tmducken.duckdb> (get-config-options)
           ;;Normally dispose-fn cannot reference things being tracked
           _ (resource/track appender {:track-type :stack
                                       :dispose-fn #(do #_(println "destroying appender")
-                                                       (duckdb-ffi/duckdb_appender_destroy app-ptr-ptr))})
+                                                    (duckdb-ffi/duckdb_appender_destroy app-ptr-ptr))})
           check-error (fn [status]
                         (when-not (= status duckdb-ffi/DuckDBSuccess)
                           (let [err (duckdb-ffi/duckdb_appender_error appender)]
@@ -360,8 +342,8 @@ tmducken.duckdb> (get-config-options)
               (dotimes [cidx n-cols]
                 (.writeLong type-buffer cidx
                             (.address ^Pointer
-                                      (duckdb-ffi/duckdb_create_logical_type
-                                       (duckdb-type-ids cidx))))))
+                             (duckdb-ffi/duckdb_create_logical_type
+                              (duckdb-type-ids cidx))))))
           write-chunk (duckdb-ffi/duckdb_create_data_chunk logical-types n-cols)
           wrap-addr #(native-buffer/wrap-address
                       %1 %2 %3
@@ -417,8 +399,8 @@ tmducken.duckdb> (get-config-options)
 
                  (case col-dt
                    (:int8 :uint8 :boolean) (dt/copy! subcol (wrap-addr daddr row-count (if (= :uint8 col-dt)
-                                                                                        :uint8
-                                                                                        :int8)))
+                                                                                         :uint8
+                                                                                         :int8)))
                    (:int16 :uint16) (dt/copy! subcol (wrap-addr daddr (* 2 row-count) col-dt))
                    (:int32 :uint32 :float32) (dt/copy! subcol (wrap-addr daddr (* 4 row-count) col-dt))
                    (:int64 :uint64 :float64) (dt/copy! subcol (wrap-addr daddr (* 8 row-count) col-dt))
@@ -492,7 +474,6 @@ tmducken.duckdb> (get-config-options)
               (duckdb-ffi/duckdb_destroy_logical_type (Pointer. (+ types-addr (* cidx 8)))))))))))
   ([conn dataset] (insert-dataset! conn dataset nil)))
 
-
 (defn- validity->missing
   "Validity is 64 bit."
   ^RoaringBitmap [^long n-rows ^Pointer nmask]
@@ -514,7 +495,6 @@ tmducken.duckdb> (get-config-options)
                   (recur (unchecked-inc bit-idx))))))))
       rval)))
 
-
 (defprotocol ^:private PDelayedClone
   (delayed-clone [this]))
 
@@ -522,7 +502,6 @@ tmducken.duckdb> (get-config-options)
   PDelayedClone
   (delayed-clone [this]
     (delay (dt/clone this))))
-
 
 (deftype ^:private GenericObjReader [dtype cls-type ^IFnDef$LO accessor ^long sidx ^long eidx]
   ObjectReader
@@ -559,9 +538,7 @@ tmducken.duckdb> (get-config-options)
   (clone [this]
     @(delayed-clone this)))
 
-
 (deftype ^:private UUIDReader [])
-
 
 (defn- coldata->buffer
   [^RoaringBitmap missing n-rows logical-type ddb-vec]
@@ -620,7 +597,7 @@ tmducken.duckdb> (get-config-options)
       (-> (native-buffer/wrap-address data-ptr (* 8 n-rows) nil)
           (native-buffer/set-native-datatype :packed-local-time))
 
-      :DUCKDB_TYPE_TIMESTAMP
+      (:DUCKDB_TYPE_TIMESTAMP :DUCKDB_TYPE_TIMESTAMP_TZ)
       (-> (native-buffer/wrap-address data-ptr (* 8 n-rows) nil)
           (native-buffer/set-native-datatype :packed-instant))
 
@@ -711,12 +688,10 @@ tmducken.duckdb> (get-config-options)
          0 n-rows))
       (throw (RuntimeException. (format "Failed to get a valid column type for duckdb-type-id %d" type-id))))))
 
-
 (defn- supplier-seq
   [^Supplier s]
   (when-let [item (.get s)]
     (cons item (lazy-seq (supplier-seq s)))))
-
 
 (deftype ^:private SupplierIter [^Supplier sup
                                  ^:unsynchronized-mutable val]
@@ -729,7 +704,6 @@ tmducken.duckdb> (get-config-options)
       (set! val (.get sup))
       retval)))
 
-
 (defn- track-chunk
   [chunk]
   (let [addr (.address ^Pointer chunk)]
@@ -737,12 +711,10 @@ tmducken.duckdb> (get-config-options)
                            :dispose-fn
                            #(duckdb-ffi/duckdb_destroy_data_chunk (dt-ffi/make-ptr :pointer addr))})))
 
-
 (defn- destroy-chunk
   [chunk]
   (when (and chunk (not (== 0 (.address ^Pointer chunk))))
     (duckdb-ffi/duckdb_destroy_data_chunk (dt-ffi/make-ptr :pointer (.address ^Pointer chunk)))))
-
 
 (defn- reduce-chunk
   [chunk realize-chunk reduce-type rf acc]
@@ -759,7 +731,6 @@ tmducken.duckdb> (get-config-options)
     (do
       (track-chunk chunk)
       (rf acc (realize-chunk chunk false)))))
-
 
 (deftype ^:private RealizedResultChunks [sql
                                          ^long n-elems
@@ -802,9 +773,7 @@ tmducken.duckdb> (get-config-options)
   Object
   (toString [this] (str "#duckdb-realized-result-" n-elems "[\"" sql "\"]")))
 
-
 (dtype-pp/implement-tostring-print RealizedResultChunks)
-
 
 (deftype ^:private StreamingResultChunks [sql
                                           result
@@ -837,9 +806,7 @@ tmducken.duckdb> (get-config-options)
   Object
   (toString [this] (str "#duckdb-streaming-result"  "[\"" sql "\"]")))
 
-
 (dtype-pp/implement-tostring-print StreamingResultChunks)
-
 
 (defn- results->datasets
   ^AutoCloseable [sql duckdb-result options]
@@ -907,7 +874,6 @@ tmducken.duckdb> (get-config-options)
 
 (declare prepare)
 
-
 (defn sql->datasets
   "Execute a query returning either a sequence of datasets or a single dataset.
 
@@ -948,8 +914,6 @@ _unnamed [5 3]:
   (^AutoCloseable [conn sql]
    (sql->datasets conn sql nil)))
 
-
-
 (defn sql->dataset
   "Execute a query returning a single dataset.  This runs the query in a context that releases the memory used
   for the result set before function returns returning a dataset that has no native bindings."
@@ -957,46 +921,45 @@ _unnamed [5 3]:
    (sql->datasets conn sql (assoc options :result-type :single)))
   ([conn sql] (sql->dataset conn sql nil)))
 
-
 (defn- bind-prepare-param
   [stmt idx v]
   ;;type-id appears unreliable at this timee
   #_(let [errcode
-        (if (nil? v)
-          (duckdb-ffi/duckdb_bind_null stmt idx (if (Casts/booleanCast v) 1 0))
-          (case type-id
-            duckdb-ffi/DUCKDB_TYPE_BOOLEAN (duckdb-ffi/duckdb_bind_boolean stmt idx (if (Casts/booleanCast v) 1 0))
-            duckdb-ffi/DUCKDB_TYPE_TINYINT (duckdb-ffi/duckdb_bind_int8 stmt idx (Casts/longCast v))
-            duckdb-ffi/DUCKDB_TYPE_SMALLINT (duckdb-ffi/duckdb_bind_int16 stmt idx (Casts/longCast v))
-            duckdb-ffi/DUCKDB_TYPE_INTEGER (duckdb-ffi/duckdb_bind_int32 stmt idx (Casts/longCast v))
-            duckdb-ffi/DUCKDB_TYPE_BIGINT (duckdb-ffi/duckdb_bind_int64 stmt idx (Casts/longCast v))
-            duckdb-ffi/DUCKDB_TYPE_UTINYINT (duckdb-ffi/duckdb_bind_uint8 stmt idx (Casts/longCast v))
-            duckdb-ffi/DUCKDB_TYPE_USMALLINT (duckdb-ffi/duckdb_bind_uint16 stmt idx (Casts/longCast v))
-            duckdb-ffi/DUCKDB_TYPE_UINTEGER (duckdb-ffi/duckdb_bind_uint32 stmt idx (Casts/longCast v))
-            duckdb-ffi/DUCKDB_TYPE_UBIGINT (duckdb-ffi/duckdb_bind_uint64 stmt idx (Casts/longCast v))
-            duckdb-ffi/DUCKDB_TYPE_FLOAT (duckdb-ffi/duckdb_bind_float stmt idx (Casts/doubleCast v))
-            duckdb-ffi/DUCKDB_TYPE_DATE (duckdb-ffi/duckdb_bind_date stmt idx (if (number? v)
-                                                                                (Casts/longCast v)
-                                                                                (.toEpochDay ^LocalDate v)))
-            duckdb-ffi/DUCKDB_TYPE_TIME (duckdb-ffi/duckdb_bind_time
-                                         stmt idx (if (number? v)
-                                                    (Casts/longCast v)
-                                                    (quot (.toNanoOfDay ^LocalTime v)
-                                                          dt-dt-constants/nanoseconds-in-microsecond)))
-            duckdb-ffi/DUCKDB_TYPE_TIMESTAMP (duckdb-ffi/duckdb_bind_double
-                                              stmt idx (if (number? v)
-                                                         (Casts/longCast v)
-                                                         (dt-dt-base/instant->microseconds-since-epoch v)))
-            duckdb-ffi/DUCKDB_TYPE_VARCHAR
-            (let [strval (str v)
-                  len (.length strval)]
-              (duckdb-ffi/duckdb_bind_varchar_length stmt idx strval len))))]
-    (when-not (== 0 (long errcode))
-      (let [errptr (duckdb-ffi/duckdb_prepare_error stmt)
-            errstr (if errptr
-                     (dt-ffi/c->string errptr)
-                     "Unknown Error")]
-        (throw (RuntimeException. (str "Failed to set param " idx ":" errstr))))))
+          (if (nil? v)
+            (duckdb-ffi/duckdb_bind_null stmt idx (if (Casts/booleanCast v) 1 0))
+            (case type-id
+              duckdb-ffi/DUCKDB_TYPE_BOOLEAN (duckdb-ffi/duckdb_bind_boolean stmt idx (if (Casts/booleanCast v) 1 0))
+              duckdb-ffi/DUCKDB_TYPE_TINYINT (duckdb-ffi/duckdb_bind_int8 stmt idx (Casts/longCast v))
+              duckdb-ffi/DUCKDB_TYPE_SMALLINT (duckdb-ffi/duckdb_bind_int16 stmt idx (Casts/longCast v))
+              duckdb-ffi/DUCKDB_TYPE_INTEGER (duckdb-ffi/duckdb_bind_int32 stmt idx (Casts/longCast v))
+              duckdb-ffi/DUCKDB_TYPE_BIGINT (duckdb-ffi/duckdb_bind_int64 stmt idx (Casts/longCast v))
+              duckdb-ffi/DUCKDB_TYPE_UTINYINT (duckdb-ffi/duckdb_bind_uint8 stmt idx (Casts/longCast v))
+              duckdb-ffi/DUCKDB_TYPE_USMALLINT (duckdb-ffi/duckdb_bind_uint16 stmt idx (Casts/longCast v))
+              duckdb-ffi/DUCKDB_TYPE_UINTEGER (duckdb-ffi/duckdb_bind_uint32 stmt idx (Casts/longCast v))
+              duckdb-ffi/DUCKDB_TYPE_UBIGINT (duckdb-ffi/duckdb_bind_uint64 stmt idx (Casts/longCast v))
+              duckdb-ffi/DUCKDB_TYPE_FLOAT (duckdb-ffi/duckdb_bind_float stmt idx (Casts/doubleCast v))
+              duckdb-ffi/DUCKDB_TYPE_DATE (duckdb-ffi/duckdb_bind_date stmt idx (if (number? v)
+                                                                                  (Casts/longCast v)
+                                                                                  (.toEpochDay ^LocalDate v)))
+              duckdb-ffi/DUCKDB_TYPE_TIME (duckdb-ffi/duckdb_bind_time
+                                           stmt idx (if (number? v)
+                                                      (Casts/longCast v)
+                                                      (quot (.toNanoOfDay ^LocalTime v)
+                                                            dt-dt-constants/nanoseconds-in-microsecond)))
+              duckdb-ffi/DUCKDB_TYPE_TIMESTAMP (duckdb-ffi/duckdb_bind_double
+                                                stmt idx (if (number? v)
+                                                           (Casts/longCast v)
+                                                           (dt-dt-base/instant->microseconds-since-epoch v)))
+              duckdb-ffi/DUCKDB_TYPE_VARCHAR
+              (let [strval (str v)
+                    len (.length strval)]
+                (duckdb-ffi/duckdb_bind_varchar_length stmt idx strval len))))]
+      (when-not (== 0 (long errcode))
+        (let [errptr (duckdb-ffi/duckdb_prepare_error stmt)
+              errstr (if errptr
+                       (dt-ffi/c->string errptr)
+                       "Unknown Error")]
+          (throw (RuntimeException. (str "Failed to set param " idx ":" errstr))))))
   (cond
     (nil? v)
     (duckdb-ffi/duckdb_bind_null stmt idx)
@@ -1020,15 +983,14 @@ _unnamed [5 3]:
     :else
     (throw (RuntimeException. (str "Unable to discern binding type for value: " v)))))
 
-
 (defn- -assert-n-args!
   "Assert that the `actual-n-args` matches the `n-args-desired` or throw an error if it
   does not."
   [n-args-desired actual-n-args]
   (when-not (= actual-n-args n-args-desired)
     (throw (RuntimeException.
-             (format "Prepared statement defined for %d parameters -- %d given"
-                     n-args-desired actual-n-args)))))
+            (format "Prepared statement defined for %d parameters -- %d given"
+                    n-args-desired actual-n-args)))))
 
 ;;Deftype so we can overload the tostring method
 (deftype ^:private PrepStatement [sql stmt n-params finalize-stmt]
@@ -1071,14 +1033,13 @@ _unnamed [5 3]:
   (applyTo [this args]
     (-assert-n-args! n-params (count args))
     (reduce (hamf-rf/indexed-accum
-              acc idx v
-              (bind-prepare-param stmt (inc idx) v))
+             acc idx v
+             (bind-prepare-param stmt (inc idx) v))
             nil
             args)
     (finalize-stmt))
   AutoCloseable
   (close [this] nil))
-
 
 (dtype-pp/implement-tostring-print PrepStatement)
 (defn- datasets->dataset
@@ -1096,15 +1057,15 @@ _unnamed [5 3]:
   "Helper function to create an error from a potentially variadic number of err-ptrs."
   [msg & err-ptrs]
   (RuntimeException.
-    (str (when msg (str msg ":\n"))
-         (let [sub-msg (clojure.string/join
-                         " - "
-                         (for [err-ptr err-ptrs
-                               :when   (some? err-ptr)]
-                           (dt-ffi/c->string err-ptr)))]
-           (if (seq sub-msg)
-             sub-msg
-             "Unknown Error")))))
+   (str (when msg (str msg ":\n"))
+        (let [sub-msg (clojure.string/join
+                       " - "
+                       (for [err-ptr err-ptrs
+                             :when   (some? err-ptr)]
+                         (dt-ffi/c->string err-ptr)))]
+          (if (seq sub-msg)
+            sub-msg
+            "Unknown Error")))))
 
 (defn- -execute-statement!
   "Execute the statement at `stmt-ix` using the provided `conn`, extracted `stmts` and
@@ -1137,10 +1098,10 @@ _unnamed [5 3]:
            skip-cleanup?]}]
   (let [prepare-err     (when-not skip-prepare?
                           (when-not (zero? (duckdb-ffi/duckdb_prepare_extracted_statement
-                                             conn stmts stmt-ix stmt))
+                                            conn stmts stmt-ix stmt))
                             (->error
-                              "Error preparing statement"
-                              (duckdb-ffi/duckdb_prepare_error stmt))))
+                             "Error preparing statement"
+                             (duckdb-ffi/duckdb_prepare_error stmt))))
         create-pending* (delay
                           (if skip-execute?
                             0
@@ -1150,15 +1111,15 @@ _unnamed [5 3]:
         pending-err     (when (and (nil? prepare-err)
                                    (not (zero? @create-pending*)))
                           (->error
-                            "Error executing prepared statement"
-                            (duckdb-ffi/duckdb_pending_error pending-result)))
+                           "Error executing prepared statement"
+                           (duckdb-ffi/duckdb_pending_error pending-result)))
         realize-err     (when (and (nil? pending-err)
                                    (not skip-execute?)
                                    (not (zero? (duckdb-ffi/duckdb_execute_pending
-                                                 pending-result
-                                                 out-result))))
-                      (->error "Error realizing pending result"
-                               (duckdb-ffi/duckdb_pending_error pending-result)))
+                                                pending-result
+                                                out-result))))
+                          (->error "Error realizing pending result"
+                                   (duckdb-ffi/duckdb_pending_error pending-result)))
         err             (or prepare-err pending-err realize-err)]
     (when-not skip-cleanup?
       (duckdb-ffi/duckdb_destroy_pending pending-result)
@@ -1168,7 +1129,6 @@ _unnamed [5 3]:
       (when realize-err
         (duckdb-ffi/duckdb_destroy_result out-result))
       (throw err))))
-
 
 (defn- -new-struct
   "Helper function to make a new struct on the native heap for use with Duckdb.
@@ -1180,16 +1140,15 @@ _unnamed [5 3]:
   for the provided `struct`."
   [struct-kw & {:keys [cleanup-fn
                        pinned-resources]}]
-   (let [struct (dt-struct/new-struct struct-kw {:container-type :native-heap :resource-type :auto})
+  (let [struct (dt-struct/new-struct struct-kw {:container-type :native-heap :resource-type :auto})
          ;; Use `struct-ptr` to avoid keeping a reference to `struct` in the dispose-fn closure below.
-         struct-ptr (dt-ffi/->pointer struct)]
-     (when cleanup-fn
-       (resource/track struct
-                       {:track-type :auto
-                        :dispose-fn #(do (count pinned-resources)
-                                         (cleanup-fn struct-ptr))})
-       struct)))
-
+        struct-ptr (dt-ffi/->pointer struct)]
+    (when cleanup-fn
+      (resource/track struct
+                      {:track-type :auto
+                       :dispose-fn #(do (count pinned-resources)
+                                        (cleanup-fn struct-ptr))})
+      struct)))
 
 (defn prepare
   "Create a prepared statement returning a clojure function you can call taking args specified
@@ -1285,22 +1244,21 @@ _unnamed [5 3]:
                        options)
          finalize-stmt (fn []
                          (-execute-statement!
-                           {:conn           conn
-                            :stmts          stmts
-                            :stmt           stmt
-                            :stmt-ix        (dec n-stmts)
-                            :pending-result pending
-                            :out-result     result
-                            :streaming?     (identical? result-type :streaming)
-                            :skip-prepare?  true})
+                          {:conn           conn
+                           :stmts          stmts
+                           :stmt           stmt
+                           :stmt-ix        (dec n-stmts)
+                           :pending-result pending
+                           :out-result     result
+                           :streaming?     (identical? result-type :streaming)
+                           :skip-prepare?  true})
                          (let [res-data (results->datasets sql result options)]
                            (case result-type
                              :streaming res-data
                              :realized  res-data
                              :single    (with-open [res-data res-data]
-                                       (datasets->dataset res-data)))))]
+                                          (datasets->dataset res-data)))))]
      (PrepStatement. sql stmt n-params finalize-stmt))))
-
 
 (comment
   (do
@@ -1321,7 +1279,4 @@ _unnamed [5 3]:
                                   {:a "another string longer than 12 characters" :b 2}]))
 
   (create-table! conn long-str-ds)
-  (insert-dataset! conn long-str-ds)
-
-
-  )
+  (insert-dataset! conn long-str-ds))
