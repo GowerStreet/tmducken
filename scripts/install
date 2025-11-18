@@ -2,7 +2,6 @@
 
 set -e
 
-
 clj -T:build jar
-cp target/classes/META-INF/maven/com.techascent/tmducken/pom.xml .
+cp target/classes/META-INF/maven/st.gower/tmducken/pom.xml .
 clj -X:install
