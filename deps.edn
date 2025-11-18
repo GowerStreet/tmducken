@@ -21,9 +21,9 @@
                 cider/cider-nrepl {:mvn/version "0.25.5"}
                 com.cnuernber/codox {:mvn/version "1.001"}}
    :exec-fn codox.main/-main
-   :exec-args {:group-id "com.techascent"
+   :exec-args {:group-id "st.gower"
                :artifact-id "tmducken"
-               :version "0.10.1-01"
+               :version "0.10.2"
                :name "TMDucken"
                :description "Clojure bindings for duckdb"
                :metadata {:doc/format :markdown}
@@ -50,7 +50,4 @@
   {:replace-deps {slipset/deps-deploy {:mvn/version "0.1.5"}}
    :exec-fn deps-deploy.deps-deploy/deploy
    :exec-args {:installer :local
-               :artifact "target/tmducken.jar"}}
-
-  }
- }
+               :artifact "target/tmducken.jar"}}}}
